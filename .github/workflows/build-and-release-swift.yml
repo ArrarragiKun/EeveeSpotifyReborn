@@ -133,18 +133,23 @@ jobs:
         sudo mv ipapatch.macos-arm64 /usr/local/bin/ipapatch
         sudo chmod +x /usr/local/bin/ipapatch
 
-    - name: Check Version
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        LATEST_EEVEESPOTIFY_VERSION=$(gh release list --limit 1 --json tagName --jq '.[0].tagName[5:]')
-        echo "LATEST_EEVEESPOTIFY_VERSION=$LATEST_EEVEESPOTIFY_VERSION" >> $GITHUB_ENV
-
-    - name: Create EeveeSpotify Package
+    - name: Create EeveeSpotify Package (debug)
       run: |
         EEVEESPOTIFY_PACKAGE="EeveeSpotify-${EEVEESPOTIFY_VERSION}-${SPOTIFY_VERSION}.ipa"
         echo "EEVEESPOTIFY_PACKAGE=$EEVEESPOTIFY_PACKAGE" >> $GITHUB_ENV
 
+        echo "---------- Debug variables ----------"
+        echo "SPOTIFY_PACKAGE = '$SPOTIFY_PACKAGE'"
+        echo "EEVEESPOTIFY_PACKAGE = '$EEVEESPOTIFY_PACKAGE'"
+        echo "EEVEESPOTIFY_ROOTFUL = '$EEVEESPOTIFY_ROOTFUL'"
+        echo "SWIFTPROTOBUF_ROOTFUL = '$SWIFTPROTOBUF_ROOTFUL'"
+        echo "OPENSPOTIFYSAFARIEXTENSION = '$OPENSPOTIFYSAFARIEXTENSION'"
+
+        echo "---------- Current directory ----------"
+        pwd
+        ls -lah .
+
+        echo "---------- Running ivinject-arm64 ----------"
         ivinject-arm64 "$SPOTIFY_PACKAGE" "$EEVEESPOTIFY_PACKAGE" \
           -i "$EEVEESPOTIFY_ROOTFUL" "$SWIFTPROTOBUF_ROOTFUL" "$OPENSPOTIFYSAFARIEXTENSION" \
           -s - -d --level Optimal
@@ -216,4 +221,3 @@ jobs:
         EEVEESPOTIFY_CHANNEL_ID: ${{ secrets.EEVEESPOTIFY_CHANNEL_ID }}
         EEVEESPOTIFY_CHANNEL_ACCESS_HASH: ${{ secrets.EEVEESPOTIFY_CHANNEL_ACCESS_HASH }}
       run: ./Tools/TelegramUploadEeveeSpotify
-
