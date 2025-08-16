@@ -106,11 +106,23 @@ jobs:
 
     - name: Download Decrypted Spotify Package
       run: |
-        response=$(curl -ks 'https://decrypt.whoeevee.com/decrypted?appId=324684580&apiKey=${{ secrets.EEVEEDECRYPTER_API_KEY }}')
+        response=$(curl -ks "https://decrypt.whoeevee.com/decrypted?appId=324684580&apiKey=${{ secrets.EEVEEDECRYPTER_API_KEY }}")
         link=$(echo "$response" | jq -r '.link')
-        wget --no-check-certificate -q $link
-        echo "SPOTIFY_VERSION=${${(s/-/)link}[2]%.ipa}" >> $GITHUB_ENV
-        echo "SPOTIFY_PACKAGE=$(echo *.ipa)" >> $GITHUB_ENV
+
+        # Download the IPA and capture the real filename
+        wget --content-disposition --no-check-certificate -q "$link"
+
+        # Find the downloaded IPA file
+        SPOTIFY_PACKAGE=$(ls *.ipa | head -n 1)
+        if [ -z "$SPOTIFY_PACKAGE" ]; then
+          echo "Error: Spotify IPA was not downloaded!"
+          exit 1
+        fi
+
+        # Set environment variables
+        echo "SPOTIFY_PACKAGE=$SPOTIFY_PACKAGE" >> $GITHUB_ENV
+        SPOTIFY_VERSION="${SPOTIFY_PACKAGE%.ipa}"
+        echo "SPOTIFY_VERSION=$SPOTIFY_VERSION" >> $GITHUB_ENV
 
     - name: Setup insert-dylib
       run: |
@@ -151,73 +163,4 @@ jobs:
 
         echo "---------- Running ivinject-arm64 ----------"
         ivinject-arm64 "$SPOTIFY_PACKAGE" "$EEVEESPOTIFY_PACKAGE" \
-          -i "$EEVEESPOTIFY_ROOTFUL" "$SWIFTPROTOBUF_ROOTFUL" "$OPENSPOTIFYSAFARIEXTENSION" \
-          -s - -d --level Optimal
-
-    - name: Create Patched Package
-      run: |
-        EEVEESPOTIFY_PATCHED_PACKAGE="EeveeSpotify-${EEVEESPOTIFY_VERSION}-${SPOTIFY_VERSION}-patched.ipa"
-        echo "EEVEESPOTIFY_PATCHED_PACKAGE=$EEVEESPOTIFY_PATCHED_PACKAGE" >> $GITHUB_ENV
-
-        ipapatch -input "$EEVEESPOTIFY_PACKAGE" -output "$EEVEESPOTIFY_PATCHED_PACKAGE"
-
-    - name: Compose Changelog
-      if: env.LATEST_EEVEESPOTIFY_VERSION != env.EEVEESPOTIFY_VERSION
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        last_update_repo_date=$(git log -1 --grep="update: repo" --format=%cI)
-        CHANGELOG=""
-
-        gh pr list --state merged --search "merged:>${last_update_repo_date}" --json files,author \
-          | jq -r '
-              .[]
-              | .author.login as $login
-              | .files[0].path as $file
-              | "\($login) \($file)"
-            ' \
-          | tail -r \
-          | while read -r login file; do
-              lang_code=$(echo "$file" | grep -oE '/([a-zA-Z-]+)\.lproj/' | sed -E 's|/([a-zA-Z-]+)\.lproj/|\1|')
-              lang_name=$(echo "import Foundation; print(Locale.current.localizedString(forIdentifier: \"$lang_code\") ?? \"\")" | swift -)
-                
-              if [ -z "$lang_name" ]; then
-                continue
-              fi
-
-              CHANGELOG+="* Updated ${lang_name} localization by @${login}"$'\n'
-            done
-
-        echo "CHANGELOG<<EOF" >> $GITHUB_ENV
-        echo "$CHANGELOG" >> $GITHUB_ENV
-        echo "EOF" >> $GITHUB_ENV
-
-    - name: Create Release
-      if: env.LATEST_EEVEESPOTIFY_VERSION != env.EEVEESPOTIFY_VERSION
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      with:
-        tag_name: swift${{ env.EEVEESPOTIFY_VERSION }}
-        release_name: Swift ${{ env.EEVEESPOTIFY_VERSION }}
-        body: ${{ env.CHANGELOG }}
-        draft: false
-        prerelease: false
-
-    - name: Upload Packages
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        gh release upload "swift$EEVEESPOTIFY_VERSION" \
-          "$EEVEESPOTIFY_ROOTFUL" "$EEVEESPOTIFY_ROOTLESS" \
-          "$SWIFTPROTOBUF_ROOTFUL" "$SWIFTPROTOBUF_ROOTLESS" \
-          --clobber
-
-    - name: Upload Packages to Telegram
-      env:
-        API_ID: ${{ secrets.API_ID }}
-        API_HASH: ${{ secrets.API_HASH }}
-        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-        EEVEESPOTIFY_CHANNEL_ID: ${{ secrets.EEVEESPOTIFY_CHANNEL_ID }}
-        EEVEESPOTIFY_CHANNEL_ACCESS_HASH: ${{ secrets.EEVEESPOTIFY_CHANNEL_ACCESS_HASH }}
-      run: ./Tools/TelegramUploadEeveeSpotify
+          -i "$EEVEESPOTIFY_ROOTFUL"_
