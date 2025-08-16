@@ -1,7 +1,12 @@
 name: Build and Release Swift
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
+    inputs:
+      spotify_url:
+        description: "Direct download URL for Spotify IPA"
+        required: true
+        type: string
 
 env:
   SWIFTPROTOBUF_VERSION: "1.29.0"
@@ -104,22 +109,17 @@ jobs:
         git clone https://github.com/BillyCurtis/OpenSpotifySafariExtension
         echo "OPENSPOTIFYSAFARIEXTENSION=OpenSpotifySafariExtension/OpenSpotifySafariExtension.appex" >> $GITHUB_ENV
 
-    - name: Download Decrypted Spotify Package
+    - name: Download Spotify IPA
       run: |
-        response=$(curl -ks "https://decrypt.whoeevee.com/decrypted?appId=324684580&apiKey=${{ secrets.EEVEEDECRYPTER_API_KEY }}")
-        link=$(echo "$response" | jq -r '.link')
+        echo "Downloading from ${{ github.event.inputs.spotify_url }}"
+        wget --content-disposition --no-check-certificate -q "${{ github.event.inputs.spotify_url }}"
 
-        # Download the IPA and capture the real filename
-        wget --content-disposition --no-check-certificate -q "$link"
-
-        # Find the downloaded IPA file
         SPOTIFY_PACKAGE=$(ls *.ipa | head -n 1)
         if [ -z "$SPOTIFY_PACKAGE" ]; then
           echo "Error: Spotify IPA was not downloaded!"
           exit 1
         fi
 
-        # Set environment variables
         echo "SPOTIFY_PACKAGE=$SPOTIFY_PACKAGE" >> $GITHUB_ENV
         SPOTIFY_VERSION="${SPOTIFY_PACKAGE%.ipa}"
         echo "SPOTIFY_VERSION=$SPOTIFY_VERSION" >> $GITHUB_ENV
