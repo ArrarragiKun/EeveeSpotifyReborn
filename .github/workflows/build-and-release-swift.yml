@@ -217,8 +217,3 @@ jobs:
         EEVEESPOTIFY_CHANNEL_ACCESS_HASH: ${{ secrets.EEVEESPOTIFY_CHANNEL_ACCESS_HASH }}
       run: ./Tools/TelegramUploadEeveeSpotify
 
-  update-repo:
-      needs: release
-      permissions:
-        contents: write
-      uses: ./.github/workflows/update-repo.yml
